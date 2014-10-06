@@ -1,0 +1,27 @@
+CC = cl -nologo -ASw
+AS = ml -nologo
+
+OPTIM = -Ox
+DEBUG = -DDEBUG
+
+CFLAGS += -Zp1 -G2s -I../libdd -I../tape $(DEBUG) $(OPTIM) $(BUGS) -DBASEDEV
+ASFLAGS += -Zm -Cp -I../libdd
+LDFLAGS	+= -F 2000 -Fm -Lp -link /noe /nod /se:256
+LDLIBS += ..\libdd\dd.lib os2.lib
+
+.c.obj:
+	$(CC) $(CFLAGS) -c $<
+
+.asm.obj:
+	$(AS) $(ASFLAGS) -c $<
+
+Includes = addtape.h iorb.h
+Objects	=  header.obj main.obj init.obj
+
+scsitest.dmd: $(Objects) scsitape.def
+	$(CC) -o $@ $& $(LDLIBS) $(LDFLAGS) 
+
+init.obj : init.c $(Includes)
+	$(CC) $(CFLAGS) -NTITEXT -c init.c
+
+main.obj init.obj : $(Includes)

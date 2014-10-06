@@ -1,0 +1,43 @@
+###############################################################################
+# $Id: makefile.os2,v 1.2 1992/09/11 21:17:16 ak Rel $
+###############################################################################
+# $Log: makefile.os2,v $
+# Revision 1.2  1992/09/11  21:17:16  ak
+# Added -Uunix
+#
+# Revision 1.1  1992/09/02  19:05:15  ak
+# Initial revision
+#
+# Revision 1.1.1.1  1992/01/06  20:27:25  ak
+# Interface now based on ST01 and ASPI.
+# AHA_DRVR no longer supported.
+# Files reorganized.
+#
+# Revision 1.1  1992/01/06  20:27:23  ak
+# Initial revision
+#
+###############################################################################
+
+usage:
+	@echo "Make one of the targets: gcc or msc!"
+
+# OS/2 32-bit, emx+gcc 0.8e
+gcc:
+	$(MAKE) -f makefile.os2 tape.exe DEF="tape.def" \
+	CC="gcc -O -Zomf" O=".obj" CFLAGS="-DOS2=2" LDFLAGS="-s -Zsys -los2"
+
+# OS/2 16-bit, MS C 6.00
+msc:
+	$(MAKE) -f makefile.os2 tape.exe DEF="tape.def" \
+	CC="cl -nologo -O" O=".obj" CFLAGS="-DOS2=1" LDFLAGS="-Lp"
+
+.c$O:
+	$(CC) $(CFLAGS) -c $<
+
+tape.exe: tctl$O tape$O errtab$O scsitape$O $(DEF)
+	$(CC) $& $(LDFLAGS) -o $@
+
+scsiaspi$O : aspi.h scsi.h
+scsitape$O : aspi.h scsi.h tapedrvr.h
+
+tape$O : tape.h scsi.h tapedrvr.h

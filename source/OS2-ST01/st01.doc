@@ -1,0 +1,122 @@
+Addresses:
+----------
+
+ C900:0A00	Control/status port
+ C900:0C00-0FFF	Data port (1KB), adress ignored
+
+Command port:
+-------------
+
+  [7]	SCSI enable		E
+  [6]	Interrupt enable	IE
+  [5]	Parity enable		PE
+  [4]	Start arbitration	ArbR
+  [3]	ATN
+  [2]	BSY
+  [1]	SEL
+  [0]	RST
+
+Status port:
+------------
+
+  [7]	Arbitration complete	ArbC
+  [6]	Parity error		PErr
+  [5]	SEL
+  [4]	REQ
+  [3]	C/D
+  [2]	I/O
+  [1]	MSG
+  [0]	BSY
+
+Operation:
+----------
+
+Default Cmd bits: EnableIRQ,EnableParity
+
+RST:
+
+	Cmd  = E+IE+PE+RST
+	.. some time
+	Cmd  = IE+PE
+	.. some time
+
+Arbitrate:
+
+	Cmd  = IE+PE
+	Data = HA target ID as bit mask
+	Cmd  = E+PE+ArbR
+	.. wait for ArbC (300 msec)
+	Data |= 1 << LUN
+	Cmd  = E+PE+IE+SEL+ATN
+	.. wait for BSY (100 msec)
+	Cmd  = IE+PE
+	.. wait (20 msec)
+	Cmd  = E*IE+PE+ATN
+	.. wait for (MSG+CD+IO+REQ) == (MSG+CD+0+REQ) (200 msec)
+	Data = 0xC0+LUN# (message out: identify, enable disconnect)
+	Cmd  = E+IE+PE
+
+Data phase (x: out=0, in=IO):
+
+	while (data available)
+		.. wait for REQ
+		if (MSG+CD+IO) != (0+0+x) then break
+		if slow then
+			transfer single byte
+		else
+			fast block transfer (max 1K)
+	while (MSG+CD+IO+REQ) == (0+0+x+REQ)
+		transfer dummy byte
+		.. wait for REQ or timeout (a few msec)
+
+Execute transfer, controlled by target, until disconnected:
+
+	while not long timeout (sec)
+		if not BSY then return error
+		if not REQ then continue
+		case MSG+CD+IO of
+			0+0+0:		-- data out
+				Data out phase
+			0+0+IO: 	-- data in
+				Data in phase
+			0+CD+0:		-- command out
+				Data = next command byte
+			0+CD+IO:	-- status in
+				Next status byte = Data
+			MSG+CD+0:	-- message out
+				Data = null message (0x08)
+				Cmd  = E+IE+PE
+			MSG+CD+IO:	-- message in
+				message byte = Data
+				case message byte of
+					Complete, Disconnect:
+						Cmd = IE+PE
+					SavePtr:
+						save data ptr&len
+					RestorePtr:
+						restore data ptr&len
+					MessageReject:
+					Nop:
+					Identify:
+						ignore
+					otherwise:
+						if message bit [7] then
+							ignore (identify)
+						else
+							error (unknown)
+
+Interrupt /reselect):
+
+	if not SEL then 
+		error, return
+	.. wait for IO (some 10 msec)
+	id = Data
+	if HA target address bit not set in id then
+		error, return
+	lun bit = id and not (HA target address bit)
+	Cmd = E+IE+PE+BSY	-- acknowledge reselection
+	.. wait for SEL (some 10 msec)
+	.. wait for BSY (some 10 msec)
+	Cmd = E+IE+PE
+	Execute transfer, ...
+	

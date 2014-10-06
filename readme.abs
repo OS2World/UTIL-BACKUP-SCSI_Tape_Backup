@@ -1,0 +1,53 @@
+                 SCSI TAPE BACKUP for OS/2 2.0
+                 -----------------------------
+                          Version 2.10
+
+
+$Id: readme.abs,v 1.7 1993/01/16 17:36:21 ak Exp $
+
+gtak210.zip	OS/2 binaries and source
+
+Consisting of:
+
+   A SCSI tape device driver based on the ADD interface (no ASPI
+   required).
+
+   A SCSI tape device driver based on the OS2SCSI.DMD interface,
+   mainly intended for the IBM PS/2 SCSI adapter.
+
+   A SCSI tape device driver based on the ASPI interface. OS/2
+   syslevel >= 2.00.1 (Service Pack) required.
+
+   A SCSI tape control program.
+
+   A port of GNU tar 1.10 to OS/2 2.0, with tape support and quick
+   file access added.
+
+Features: 
+
+   Support for HPFS filenames and extended attributes.
+
+   Complete tape control.
+
+   Full compatibility to Unix tar.
+
+   Quick file access via tape directories for SCSI-2, Tandberg
+   SCSI-1 streamers and some others.
+
+   True incremental backups either by date or by the archive bit.
+
+   Optional compression.
+
+   Can read and write non-DOS diskettes compatible to Unix.
+
+Prerequisites:
+
+   OS/2 2.0.
+
+   SCSI tape drive.
+
+   SCSI adapter with true SCSI driver. Tested ok: Adaptec 154x, 174x,
+   Future-Domain, DPT2011, IBM SCSI 32-bit.
+
+   Some knowledge of the Unix tar program, a Unix manual with a page on
+   tar or the ability to read an outdated TeX documentation :-).

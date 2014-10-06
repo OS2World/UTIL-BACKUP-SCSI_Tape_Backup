@@ -1,0 +1,214 @@
+ST01 setup:
+-----------
+
+See ST01FIX.TXT for necessary hardware fixes. An unpatched ST01 will
+not work with the Tandberg series 3600 tape drives. Some ST01 version
+do not have the interrupt jumper installed, since DOS does not require
+interrupts. This driver *does* require interrupts. It might be wise to
+install the termination resistors too, although it might be sufficient
+to have a termination on one side (the drive) only, if the cable is
+short.
+
+Interrupt:	5
+ST01 SCSI ID:	6
+Tape SCSI ID:	4
+
+These values are defined near the top of ST_IO.ASM.
+
+Source code layout and possible modifications:
+----------------------------------------------
+
+makefile.mk:	For DMake.
+
+		SCSI_LVL=0	Tandberg's non-standard Request Sense block
+		SCSI_LVL=1	Standard Request Sense block layout.
+
+defs.inc:	trace=0 completely disables debugging trace.
+		trace=1 generates MDA debugging display, which can be
+		controlled by DosDevIOCtl calls.
+
+debug.inc/asm:	Device driver debugging helpers for output on
+		monochrome(!) card.
+
+st_tape.asm:	High level device driver interface
+
+st_io.asm:	Low level ST01 input/output
+
+	EnableFast	If the driver hangs your system when used, set
+			this constant to 0 to relax the critical i/o
+			timing. If it works now (probably very slow),
+			try to fine-tune the corresponding fast-I/O
+			loops/block-transfers (see below).
+
+	EnableBlock	If set to 1, maximum-speed block transfers are
+			used for data transfer. This proved unusable in
+			a 486 system, but might be reliable on 386
+			systems. If set to 0, the transfer timing is
+			somewhat relaxed, suitable for at least one
+			486-33MHz system.
+
+			The critical code for EnableFast and EnableBlock
+			is located behind the labels "x_fast_in:" and
+			"x_fast_out:".
+
+	PhysIO		Physical address of the ST01 I/O ports. In a
+			ST01 equipped with 8KB ROMs this should be set
+			to the ROM base address + 1A00h. While I know
+			there are cards equipped with 16KB ROMs, I
+			have not seen such a beast yet. You have to
+			look for the addresses yourself, but probably
+			the I/O addresses are at ROM-base + 3A00h.
+
+	IRQnum		The interrupt number to which the ST01 is
+			connected.
+
+	TargetID	The SCSI ID of the streamer.
+
+Implemented char device driver functions:
+-----------------------------------------
+
+	Read
+	Write
+	IOCtl
+
+Since reads and writes are checked for transfer lengths of a multiple
+of 512, it is not possible to access the drive in DOS mode (DOS mode
+transfers 1 byte at a time). Likewise it is usually not possible to copy
+a file to the device (the last block will most likely fail). Use the
+tape utility instead.
+
+Read/Write command return codes:
+--------------------------------
+
+EOF (0 bytes):		- Filemark detected.
+
+Change disk:		- Unit attention. Reported on the next command
+			following a power-up, reset or media change.
+
+Character I/O call	- The operation was interrupted due to signal
+interrupted:		(Ctrl-C/Break), process death or the like.
+
+Read fault:		- Reached logical EOM.
+
+Write fault:		- Reached physical EOM.
+			- A write operation was attempted in a position
+			between BOT and logical EOM.
+
+Not ready:		- Drive reports "not ready", "not loaded",
+			"hardware error" or bus parity error.
+			- Drive reports reservation conflict.
+			- Drive did not respond to abort or reset 
+			message request (triggers bus reset).
+
+CRC error:		- Bad block (read, verify).
+			- Uncorrectable data error (write).
+			- Compare operation failed (verify).
+
+Sector not found:	- No data on the media.
+
+Write proteced:		- Media is write-protected.
+
+General failure:	- Driver error. Usually due to bus phase 
+			sequencing timeout.
+			- The specified CDB or data length differs
+			from the length expected by the target.
+
+Invalid command:	- Invalid IOCtl code.
+			- Invalid SCSI command.
+
+Unknown media:		- Command received "check condition" status but
+			the "request sense" command failed or returned
+			an unknown error code.
+
+Invalid parameter:	- R/W data length not a multiple of 512 (DOS mode).
+			IOCtl pointer validation check failed.
+
+
+IOCtl commands:
+---------------
+
+Category 11, function 01h:	Flush input buffer.
+
+	Ignored.
+
+Category 11, function 02h:	Flush output buffer.
+
+	Ignored.
+
+Category 11, function 41h:	Session switch notification.
+
+	Ignored.
+
+Category 11, function 60h:	Query monitor support.
+
+	Returns "monitor calls not supported".
+
+Category 80h, function 0:	SCSI command, slow data transfer.
+Category 80h, function 1:	SCSI command, fast data transfer.
+
+	Parameter block is SCSI CDB (command descriptor block)
+	(read-only). Data block is SCSI data transfer block
+	(read-write). Since the length specifications of the 
+	parameter and data areas are required, you have to use 
+	DevIOCtl2. If there is no data transfer, the data pointer
+	must be 0.
+
+	If the command fails, the status byte is returned as 
+	"user defined error code" (0FF02h for "check status"). 
+	There is no implied REQUEST SENSE command.
+-->	BUG: The current version never return 0FF02. Always
+	issue REQEST SENSE after an IOCtl CDB command.
+
+	The "fast data transfer" function is only to be used for
+	SCSI commands with high speed block transfer. Commands
+	with delays between successive bytes might give	unexpec-
+	ted results or might even crash the system. The fast data 
+	transfer mode waits for new data every 512 bytes. It 
+	should not be used for operations other than standard
+	read or write - even the "inquiry" command is a slow
+	command on Tandberg 3600. Additionally it requires the
+	tape block size to be a multiple of 512.
+
+Category 80h, function 2:	Bus reset.
+
+	Resets the SCSI bus and all connected devices.
+	Parameter and data block is neither checked nor used.
+
+Category 80h, function 3:	Device reset.
+
+	Resets the target device only.
+	Parameter and data block is neither checked nor used.
+
+Category 80h, function 4:	Set trace level.
+
+	Parameter block is a single byte containing the trace level.
+	Trace output is written directly to MPA/MGA screen at
+	physical address 0B0000h.
+	0	= no trace
+	1	= errors only
+	2	= individual commands
+	3-20	= the higher the level the more detailed the trace
+
+	The trace code is currently disabled. To enable the trace 
+	code, set TRACE=1 (or whatever non-zero trace level you 
+	want as default) in DEFS.INC and reassemble all modules.
+
+Special IOCtl command return codes:
+-----------------------------------
+
+0xFF00..0xFF13	Standard device driver error code.
+0xFF80..0xFFFF	SCSI status byte.
+		0xFF82 = check status (request sense command required)
+		0xFF88 = device busy
+		0xFF98 = reservation conflict
+
+SCSI standard considerations:
+-----------------------------
+
+The driver is built for the Trandberg TDC 3600 series tape drives.
+These drives do NOT conform to SCSI-1: The error codes within the
+REQUEST SENSE data are placed at offsets 14+15 instead of 12+13.
+However, the mechanically indentical IBM RS/6000 tape drive 7207-001
+conforms to SCSI-1 (in this respect). To enable a SCSI-1 conformant
+error detection, set SCSI_LVL=1 within MAKEFILE.MK and reassemble
+ST_TAPE.ASM.

@@ -1,0 +1,128 @@
+Hardware-Patch for SCSI Host-Adapter Seagate ST01/2. 
+----------------------------------------------------
+
+By applying this fix, it is possible to use the cheap SCSI host
+adapters ST01 or ST02 as interface to the Tandberg streamer TDC 3660. I
+never tried other devices, but perhaps it is now possible to use even
+those disk drives, which normally don't work together with these
+controllers. The controller does't get faster though.
+
+There are at least 2 different versions of the ST0x adapters, an elder
+version with 8K ROM and a newer one with 16K ROM. I don't know of
+further differences. This patch refers to the 8K version.
+
+The traces for the bus signals REQ und ACK have to be cut between the
+controller chip and the SCSI connector. If termination resistors are
+used, the lines must be cut between the resistors and the chip.
+
+Hardware-Patch fuer SCSI Spar-Adapter Seagate ST01/2. 
+-----------------------------------------------------
+
+Damit wird es m”glich, zumindest dem Streamer Tandberg 3660 am ST01 zu
+betreiben. Plattenlaufwerke habe ich nicht ausprobiert, ich halte es
+jedoch fuer m”glich, dass durch diesen Patch auch solche
+Plattenlaufwerke am ST01 betrieben werden k”nnen, die sonst nicht damit
+funktionieren. Wenn auch vielleicht nicht mit Interleave 1:1 (je
+schneller die Platte desto weniger wahrscheinlich).
+
+Das Ganze bezieht sich auf die „ltere 8K-ROM-Version des ST01. Ob bei
+der 16K-ROM-Version mehr ge„ndert wurde als die ROM-Gr”áe, ist mir
+nicht bekannt.
+
+Die Leitungen der Bus-Signale REQ und ACK mssen jeweils zwischen dem
+Steuerchip und dem SCSI-Stecker aufgetrennt werden. Sind auf dem
+Adapter Abschluáwiderst„nde drauf, dann muá zwischen den
+Widerstandsnetzwerken und dem Steuerchip aufgetrennt werden.
+
+Circuit Diagram / Schaltbild:
+-----------------------------
+
+REQ = Pin 48 am SCSI Connector
+ACK = Pin 38  "        "
+
+IC's:  132 = 74LS132
+       38  = 7438
+
+                 +5V
+                  ³
+                 330
+                 Ohm
+                  ³    ³\
+            ACK ÄÄÁÄÄÄÄ´  \           ³\    
+          (Chip)       ³132ÃÄÄÄÂÄÄÄÄÄÄ´  \  
+                    ÚÄÄ´  /    ³      ³38 ÃÄÄÄÄ ACK'
+                    ³  ³/      ³ +5VÄÄ´  /     (Bus)
+                     \         ³      ³/    
+                       \       ³
+                         \     /
+                           \ /
+                           / \
+                         /     \
+                       /       ³
+                     /         ³
+                    ³  ³\      ³
+        ³\          ÀÄÄ´  \    ³   ³\   
+ REQ ÄÄÄ´  \           ³132ÃÄÄÄÁÄÄÄ´  \ 
+(Bus)   ³132ÃÄÄÄÄÄÄÄÂÄÄ´  /        ³132ÃÄÄÄÄ REQ'
+  +5VÄÄÄ´  /        ³  ³/      ÚÄÄÄ´  /     (Chip)
+        ³/          ³          ³   ³/    
+                    ÀÄÄÄÄÄÄÄÄÄÄÙ
+
+
+A Small Explanation of the Problem Solved:
+------------------------------------------
+
+The status bit REQ directly reflects the corresponding bus line. If the
+target does not release the REQ line immediately after receipt of ACK,
+but holds the line for some time, the REQ bit stays active even after
+data transfer. The controller's software will be forced into false
+transmission of the next byte.
+
+As example, the streamer mentioned above holds the REQ bit sometimes
+for up to several hundred microseconds after receipt of the first
+command byte. But in block data transfer phase, the REQ bit is released
+and resserted very fast. If the software checks for a held REQ line, it
+might then interpret the REQ for the next byte as held REQ. Therefore
+this bug is difficult to fix in software (while possible, but
+device-dependant).
+
+With this patch applied, the REQ line is released immediately after
+receipt of ACK. Since the controller chip will immediately release
+ACK, the bus line ACK is held until the bus line REQ is released.
+
+Kurze Erl„uterung des Problems, das hierdurch behoben wird: 
+-----------------------------------------------------------
+
+Das Status-Bit REQ ist ein direktes Abbild der entsprechenden
+Bus-Leitung. Wenn nun das Target die REQ-Leitung nicht unmittelbar nach
+erhaltenem ACK deaktiviert, sondern noch eine gewisse Zeit stehenl„át,
+dann bleibt das REQ-Bit auch nach erfolgtem Datentransfer entsprechend
+lang gesetzt. Dies wird von der Software jedoch f„lschlicherweise als
+Anforderung fuer das n„chste Byte verstanden.
+
+Beispielsweise kann beim o.A. Streamer das REQ-Bit noch etliche hundert
+Mikrosekunden nach einem Kommando-Byte aktiv bleiben. Umgekehrt
+existieren jedoch Transfer-Zyklen (Block-Transfer), bei denen das
+REQ-Bit bereits so schnell deaktiviert und erneut generiert wird, dass
+eine Software-Abfrage auf stehengebliebenes REQ nicht zuverl„ssig
+m”glich ist.
+
+Dieser Patch sorgt nun dafuer, dass die REQ-Leitung zum Chip des ST01
+unmittelbar nach aktiviertem ACK deaktiviert wird. Da dies jedoch zur
+sofortigen Deaktivierung von ACK durch den Steuerchip fhrt, muá
+zus„tzlich sichergestellt werden, dass ACK auf dem Bus erst deaktiviert
+wird, wenn das Target seinerseits REQ deaktiviert hat, andersfalls wird
+das Byte vom Target nicht akzeptiert.
+
+Legal Notice (I don't write legal stuff in a foreign language, sorry):
+----------------------------------------------------------------------
+
+Ich bernehme keinerlei Gew„hrleistung fr korrekte Funktion oder
+irgendwelche daraus resultierenden Sch„den oder Folgesch„den. Derartige
+Aktionen sollte man sich ohnehin nur zutrauen, wenn ausreichende Praxis
+in Elektronik und L”ten vorhanden ist.
+
+        
+                Andreas Kaiser
+                Fido:   2:241/7220.9
+                Subnet: ak@ananke.stgt.sub.org

@@ -1,0 +1,44 @@
+$Id: readme.src,v 1.4 1993/01/10 12:06:52 ak Exp $
+
+1.10:	GNU tar 1.10.
+
+	makefile	AIX
+	makefile.os2	DMake, OS/2 EMX
+
+tape:	Tape control program.
+
+	makefile	AIX
+	makefile.mk	DMake, OS/2 ZTC / MSC using my own compiler shell
+	makefile.os2	DMake, OS/2 EMX / MSC
+
+compress: File compression program
+
+        make.cmd        OS/2 EMX
+
+buffer: pipe buffer program
+
+        make.cmd        OS/2 ZTC / MSC
+
+libx:	Some OS/2 utility functions and library replacements.
+
+	I used the IBM C Toolkit to compile the sources.
+	IMPORTANT: Replace UINT by USHORT in the bit field
+	definitions of FTIME and FDATE (bsedos.h). GCC and
+	IBM C interpret bit field alignments differently
+	(It is a good idea to make this change #ifdef'ed __GNUC__.)
+
+os2-add: Tape device driver based on the ADD interface.
+
+	ZTC, -> os2-add/readme
+
+os2-aspi: Tape device driver based on the ASPI interface.
+
+	ZTC, -> os2-add/readme
+
+os2-dd:	OS/2 device driver support library .
+
+	ZTC, -> os2-dd/readme
+
+
+Note: If EMX (gcc) is used to compile, at least version 0.8e is required.
+

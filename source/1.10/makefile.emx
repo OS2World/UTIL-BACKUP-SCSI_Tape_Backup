@@ -1,0 +1,177 @@
+###############################################################################
+# $Id: makefile.emx,v 1.6 1992/09/16 21:00:00 ak Exp $
+###############################################################################
+# $Log: makefile.emx,v $
+# Revision 1.6  1992/09/16  21:00:00  ak
+# EMX 0.8e
+#
+# Revision 1.5  1992/09/13  21:16:03  ak
+# Wieder getdate vom Original, 1.10 ist da wesentlich neuer und
+# vollstaendiger als 1.06.
+#
+# Revision 1.4  1992/09/12  16:07:14  ak
+# Added entry for --fat to usage
+#
+# Revision 1.3  1992/09/12  15:57:52  ak
+# - Usenet patches for GNU TAR 1.10
+# - Bugfixes and patches of Kai Uwe Rommel:
+#         filename conversion for FAT
+#         EMX 0.8e
+#         -0..1 alias for a: b:
+#         -2..7 alias for +++TAPE$x
+#
+# Revision 1.2  1992/09/11  21:17:55  ak
+# Added -Uunix
+#
+# Revision 1.1  1992/09/02  20:07:38  ak
+# Initial revision
+#
+###############################################################################
+
+# Makefile for GNU tar program.
+
+# In order to disable remote-tape support, add -DNO_REMOTE to the
+# appropriate DEFS line, and remove rtape_lib.* from LOCAL_{SRC,OBJ}
+# For Ultrix 3.1, you will have to compile rtape_lib.c with -DUSG.
+# Add -DUSE_REXEC to use rexec for remote tape operations
+# instead of forking rsh or remsh.
+#
+# If tar fails to properly print error msgs, or core-dumps doing same,
+# you may need to change which version of msg...() you are using.
+# To do so, add one of the following to your DEFS= line
+# -DSTDC_MSG		If you are using an ANSI compiler, and have vfprintf().
+# -DVARARGS_MSG		If you have varargs.h and vfprintf()
+# -DDOPRNT_MSG		If you have _doprnt(), and no useful varargs support
+# -DLOSING_MSG		If nothing else works.
+#
+# Some non-BSD systems may have to add -DNEED_TZSET in order to have getdate.y
+# compile correctly.
+#
+# If you have a system V system which defines size_t, add -DHAVE_SIZE_T.
+# If you have a system which defines strstr, add -DHAVE_STRSTR.
+#
+# If you can't use remote tar with the rmt library, you can still get
+# some stuff to work right by adding -DUSE_REXEC.
+#
+# Some people's systems define a prototype for signal handlers which
+# require them to be declared as void.  If you get such problems in
+# rtape_lib, function command, then define -DSIGNAL_VOID.  
+#
+# getdate.y has 8 shift/reduce conflicts.
+#
+# In addition to setting DEFS appropriately for your system, you might
+# have to hand edit the #defines and #undefs in port.c.
+
+TAPEDIR= ../tape
+bindir = $(ROOTDIR)/usr/bin32
+
+    .IF $O == .obj
+COPTS = -O2
+    .ELSE
+COPTS = -O2 -g
+    .END
+
+## GNU version
+DEFS = -DMSDOS -DNONAMES -DOS2=2 -DSTDC_MSG -DTAPE_IO -I$(TAPEDIR)
+LOCAL_SRC = getdate.y ak_dir.c ak_tape.c tape.c scsitape.c errtab.c
+LOCAL_OBJ = getdate$O ak_dir$O ak_tape$O tape$O scsitape$O errtab$O
+LDFLAGS +=
+LIBS = -lx -los2
+LINT = lint
+LINTFLAGS = -abchx
+DEFBLOCKING = 20
+
+.SOURCE.h : . $(TAPEDIR)
+.SOURCE.c : . $(TAPEDIR)
+.SOURCE.o   : OBJ$O
+.SOURCE.obj : OBJ$O
+
+#CC = gcc
+#TARGET_ARCH = 
+
+CFLAGS += $(COPTS) $(ALLDEFS)
+ALLDEFS = $(DEFS) \
+	-DDEFBLOCKING=$(DEFBLOCKING)
+##AK	-DDEF_AR_FILE=$(DEF_AR_FILE)
+
+# Add things here like readdir that aren't in your standard libraries.
+# (E.g. MSDOS needs msd_dir.c, msd_dir.obj)
+SUBSRC=
+SUBOBJ=	
+
+# Destination directory and installation program for make install
+INSTALL = cp
+RM = rm -ce
+
+SRC1 =	tar.c create.c extract.c buffer.c getoldop.c update.c gnu.c mangle.c
+SRC2 =  version.c list.c names.c diffarch.c port.c wildmat.c getopt.c getopt1.c
+SRC3 =  $(LOCAL_SRC) $(SUBSRC)
+SRCS =	$(SRC1) $(SRC2) $(SRC3)
+OBJ1 =	tar$O create$O extract$O buffer$O getoldop$O list$O update$O
+OBJ2 =	version$O names$O diffarch$O port$O wildmat$O getopt$O getopt1$O
+OBJ3 =  gnu$O mangle$O $(LOCAL_OBJ) $(SUBOBJ)
+OBJS =	$(OBJ1) $(OBJ2) $(OBJ3)
+# AUX =	README PORTING Makefile TODO tar.h port.h open3.h \
+#	msd_dir.h msd_dir.c
+AUX =   README COPYING ChangeLog Makefile tar.texinfo tar.h port.h open3.h \
+	rmt.h msd_dir.h msd_dir.c rtape_server.c rtape_lib.c getdate.y \
+	getopt.h regex.h level-0 level-1 backup-specs testpad.c
+
+    .IF $O == .obj
+all:	tar-omf$E
+    .ELSE
+all:	tar-emx$E
+    .END
+
+tar-omf$E: $(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $(COPTS) $< $(LIBS) tar.def
+
+tar-emx$E: $(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $(COPTS) $< $(LIBS)
+
+rmt$E:	rtape_server.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ rtape_server.c
+
+testpad.h: testpad$E
+	testpad > testpad.h
+
+testpad4E: testpad$O
+	$(CC) -o $@ testpad$O
+
+install: all
+	-$(RM) $(bindir)/tar$E
+	$(INSTALL) tar-omf$E $(bindir)/tar.exe
+
+lint:	$(SRCS)
+	$(LINT) $(LINTFLAGS) $(ALLDEFS) $(SRCS)
+
+TAGS:	$(SRCS)
+	etags $(SRCS)
+
+clean:
+	$(RM) errs $(OBJS) tar rmt testpad$O testpad testpad.h
+
+distclean: clean
+
+realclean: clean
+
+shar: $(SRCS) $(AUX)
+	shar $(SRCS) $(AUX) | compress > tar-`sed -e '/version_string/!d' -e 's/[^0-9.]*\([0-9.]*\).*/\1/' -e q version.c`.shar.Z
+
+dist: $(SRC1) $(SRC2) $(AUX)
+	echo tar-`sed -e '/version_string/!d' -e 's/[^0-9.]*\([0-9.]*\).*/\1/' -e q < version.c` > .fname
+	-rm -rf `cat .fname`
+	mkdir `cat .fname`
+	ln $(SRC1) $(SRC2) $(AUX) `cat .fname`
+	tar chZf `cat .fname`.tar.Z `cat .fname`
+	-rm -rf `cat .fname` .fname
+
+tar.zoo: $(SRCS) $(AUX)
+	-mkdir tmp.dir
+	-rm tar.zoo
+	for X in $(SRCS) $(AUX) ; do echo $$X ; sed 's/$$//' $$X > tmp.dir/$$X ; done
+	cd tmp.dir ; zoo aM ../tar.zoo *
+	-rmdir tmp.dir
+
+$(OBJS): tar.h port.h testpad.h
+regex$O tar$O: regex.h
